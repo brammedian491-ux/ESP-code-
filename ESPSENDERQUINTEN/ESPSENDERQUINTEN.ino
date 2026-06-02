@@ -29,6 +29,7 @@ uint8_t RECEIVER_MAC[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
 #define MQ7_DIGITAL_PIN    33
 #define DUST_LED_PIN       26
 #define DUST_ANALOG_PIN    36
+#define LED_PIN            27
 
 // ===================== STEP 3: TIMING =====================
 #define SAMPLE_INTERVAL_MS   2000   // Read sensors every 2 seconds
