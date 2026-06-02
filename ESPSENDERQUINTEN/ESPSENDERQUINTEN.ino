@@ -163,3 +163,25 @@ void loop() {
     wasAlert = packet.alert;  // Remember for next loop
   }
 }
+
+
+
+// ===================== LED CONTROL =====================
+void updateLEDs() {
+  uint32_t color;
+
+  // Determine color based on highest sensor reading
+  uint16_t highest = max(packet.mq135, max(packet.mq7, packet.dust));
+
+  if (highest < 1000) {
+    color = strip.Color(0, 255, 0);      // Green = clean
+  } else if (highest < 2000) {
+    color = strip.Color(255, 255, 0);    // Yellow = moderate
+  } else {
+    color = strip.Color(255, 0, 0);      // Red = bad
+  }
+
+  strip.fill(color);
+
+}
+
