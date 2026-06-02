@@ -11,7 +11,7 @@
 
 #include <esp_now.h>
 #include <WiFi.h>
-#include <Adafruit_NeoPixel.h>
+//#include <Adafruit_NeoPixel.h>
 
 // ===================== STEP 1: PINS =====================
 #define FAN_PWM_PIN    18
@@ -20,14 +20,7 @@
 
 // ===================== STEP 2: LED SETUP =====================
 #define NUM_LEDS       8
-Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
-// ===================== STEP 3: FAN PWM SETUP =====================
-// PWM = Pulse Width Modulation = flickering the power on/off really fast
-// to control fan speed. 25kHz is the standard frequency for PC fans.
-#define PWM_CHANNEL    0
-#define PWM_FREQ       25000
-#define PWM_RES        8          // 8-bit = values 0 to 255
+//Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // ===================== STEP 4: THRESHOLDS =====================
 // These are RAW ADC values (0-4095). we can adjust it after testing!
@@ -55,19 +48,17 @@ void setup() {
   Serial.println("=== VENTILATION CONTROLLER ===");
 
   // LED strip init
-  strip.begin();
+  /*strip.begin();
   strip.setBrightness(80);
   strip.fill(strip.Color(0, 0, 255));  // Blue = booting
-  strip.show();
+  strip.show();*/
 
   // Buzzer init
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
   // Fan PWM init
-  ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RES);
-  ledcAttachPin(FAN_PWM_PIN, PWM_CHANNEL);
-  ledcWrite(PWM_CHANNEL, 0);  // Start with fan OFF
+  pinMode(FAN_PWM_PIN, OUTPUT);
 
   // WiFi + ESP-NOW init
   WiFi.mode(WIFI_STA);
@@ -77,19 +68,20 @@ void setup() {
 
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP-NOW failed!");
-    strip.fill(strip.Color(255, 0, 255));  // Magenta = error
-    strip.show();
+    //strip.fill(strip.Color(255, 0, 255));  // Magenta = error
+    //strip.show();
     while (true) { delay(1000); }
   }
 
-  esp_now_register_recv_cb(onDataRecv);
+  esp_now_register_recv_cb(esp_now_recv_cb_t(onDataRecv));
 
   // Ready!
-  strip.fill(strip.Color(0, 255, 0));  // Green = ready
-  strip.show();
+  /*strip.fill(strip.Color(0, 255, 0));  // Green = ready
+  strip.show();*/
   Serial.println("Ready! Waiting for sensor data...\n");
 }
 
+// ===================== ESP-NOW CALLBACK =====================
 // Called automatically when data arrives from sender
 void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
   if (len == sizeof(SensorPacket)) {
@@ -113,21 +105,21 @@ void setFanSpeed() {
   // Very polluted (~3500) = fan max (255)
   int duty = map(highest, 500, 3500, 0, 255);
 
-  // Don't let it go below 0 or above 255
+  /*// Don't let it go below 0 or above 255
   if (duty < 0) duty = 0;
-  if (duty > 255) duty = 255;
+  if (duty > 255) duty = 255;*/
 
   // Optional: minimum fan speed so it doesn't stall
   if (duty > 0 && duty < 40) duty = 40;
 
-  ledcWrite(PWM_CHANNEL, duty);
+  analogWrite(FAN_PWM_PIN, duty);
 
   // Print for debugging
   Serial.printf("Highest:%4d -> Fan:%3d/255\n", highest, duty);
 }
 
 // ===================== LED CONTROL =====================
-void updateLEDs() {
+/*void updateLEDs() {
   uint32_t color;
 
   // Determine color based on highest sensor reading
@@ -143,7 +135,7 @@ void updateLEDs() {
 
   strip.fill(color);
 
-}
+}*/
 
 // ===================== MAIN LOOP =====================
 void loop() {
@@ -157,18 +149,17 @@ void loop() {
 
     // Update everything
     setFanSpeed();
-    updateLEDs();
-    checkBuzzer();
+    //updateLEDs();
+    //checkBuzzer();
   }
 
   // Safety: if no data for 10 seconds, run fan at low speed
-  if (millis() - lastDataTime > 10000 && lastDataTime > 0) {
-    ledcWrite(PWM_CHANNEL, 60);  // Low speed for safety
-    strip.fill(strip.Color(255, 0, 255));  // Magenta = no data
-    strip.show();
+  if (millis() - lastDataTime > 10000) {
+    analogWrite(FAN_PWM_PIN, 60);  // Low speed for safety
+    //strip.fill(strip.Color(255, 0, 255));  // Magenta = no data
+    //strip.show();
     Serial.println("No data! Running fan at safety speed.");
     lastDataTime = millis();  // Reset so we don't spam
   }
 
-  delay(100);
 }
