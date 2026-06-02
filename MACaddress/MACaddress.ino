@@ -14,3 +14,7 @@ void setup() {
 }
 
 void loop() {}
+
+
+
+// SENDER MAC: 24:EC:4A:10:7B:04  RECEIVER MAC: 24:EC:4A:10:7D:84
