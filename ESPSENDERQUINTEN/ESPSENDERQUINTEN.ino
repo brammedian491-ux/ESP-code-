@@ -1,4 +1,4 @@
-CODE FIRST ESP -> the sender in the lamp!
+//CODE FIRST ESP -> the sender in the lamp!
 
 /*
   ESP32 SENDER - Lamp Unit with Sensors
@@ -20,7 +20,7 @@ CODE FIRST ESP -> the sender in the lamp!
 // ===================== STEP 1: SET RECEIVER MAC =====================
 // Run the receiver sketch first, check Serial Monitor for its MAC
 // Then replace the line below with that MAC address
-uint8_t RECEIVER_MAC[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+uint8_t RECEIVER_MAC[6] = {0x24, 0xEC, 0x4A, 0x10, 0x7D, 0x84};
 
 // ===================== STEP 2: PINS =====================
 #define MQ135_ANALOG_PIN   34
@@ -79,7 +79,7 @@ void setup() {
   }
 
   // Register callback (tells us if send worked or not)
-  esp_now_register_send_cb(onDataSent);
+  esp_now_register_send_cb(esp_now_send_cb_t(onDataSent));
 
   // Add the receiver as a "peer" (who we send to)
   memcpy(peerInfo.peer_addr, RECEIVER_MAC, 6);
@@ -94,6 +94,8 @@ void setup() {
   Serial.println("Ready! Reading sensors...\n");
 }
 
+
+// ===================== ESP-NOW CALLBACK =====================
 // Called after every send, tells us success or fail
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("Send: ");
@@ -114,11 +116,10 @@ uint16_t readDust() {
 
 // ===================== MAIN LOOP =====================
 void loop() {
-  unsigned long now = millis();
 
   // Only read sensors every SAMPLE_INTERVAL_MS (2 seconds)
-  if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-    lastSampleTime = now;
+  if (millis() - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+    lastSampleTime = millis();
 
     // Read all three sensors (raw values, 0-4095)
     packet.mq135 = analogRead(MQ135_ANALOG_PIN);
@@ -143,9 +144,9 @@ void loop() {
 
     if (packet.alert) {
       // In alert mode: send immediately, then repeat every ALERT_REPEAT_MS
-      if (now - lastAlertTime >= ALERT_REPEAT_MS) {
+      if (millis() - lastAlertTime >= ALERT_REPEAT_MS) {
         shouldSend = true;
-        lastAlertTime = now;
+        lastAlertTime = millis();
       }
     } else {
       // Not in alert: send once when transitioning from alert to normal
@@ -168,7 +169,7 @@ void loop() {
 
 
 // ===================== LED CONTROL =====================
-void updateLEDs() {
+/*void updateLEDs() {
   uint32_t color;
 
   // Determine color based on highest sensor reading
@@ -184,5 +185,4 @@ void updateLEDs() {
 
   strip.fill(color);
 
-}
-
+}*/
