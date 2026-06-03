@@ -69,8 +69,10 @@ void setup() {
 
   // Start WiFi in station mode (needed for ESP-NOW)
   WiFi.mode(WIFI_STA);
-  Serial.print("My MAC: ");
-  Serial.println(WiFi.macAddress());
+  // This is the MAC function for ESP8266 and will not work for ESP32
+  // see https://randomnerdtutorials.com/esp-now-esp32-arduino-ide/ (ESP32: Getting Board MAC Address) how to do it correctly for ESP32
+  //Serial.print("My MAC: ");
+  //Serial.println(WiFi.macAddress());
 
   // Start ESP-NOW
   if (esp_now_init() != ESP_OK) {
