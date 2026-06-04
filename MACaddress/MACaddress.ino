@@ -7,7 +7,7 @@ void setup() {
   delay(2000);
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin();      // force WiFi initialization
+  WiFi.begin();     
   delay(1000);
 
   Serial.println(WiFi.macAddress());
