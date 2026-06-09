@@ -4,9 +4,9 @@
   Visual/audio alerts via WS2812B LEDs and piezo buzzer
 
   Pin assignments:
-  Fan PWM (MOSFET) -> GPIO 18
-  WS2812B data     -> GPIO 27
-  Buzzer           -> GPIO 25
+  Fan PWM (MOSFET) -> GPIO 12
+  Buzzer           -> GPIO 8
+  Tacho fan wire (for future speed feedback) -> GPIO 11
 */
 
 #include <esp_now.h>
@@ -14,13 +14,9 @@
 //#include <Adafruit_NeoPixel.h>
 
 // ===================== STEP 1: PINS =====================
-#define FAN_PWM_PIN    18
-#define LED_PIN        27
-#define BUZZER_PIN     25
-
-// ===================== STEP 2: LED SETUP =====================
-#define NUM_LEDS       8
-//Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+#define FAN_PWM_PIN    12
+#define BUZZER_PIN     8
+#define TACHO_PIN      11  // Fan speed feedback wire (Yellow/White)
 
 // ===================== STEP 4: THRESHOLDS =====================
 // These are RAW ADC values (0-4095). we can adjust it after testing!
@@ -47,18 +43,16 @@ void setup() {
   delay(500);
   Serial.println("=== VENTILATION CONTROLLER ===");
 
-  // LED strip init
-  /*strip.begin();
-  strip.setBrightness(80);
-  strip.fill(strip.Color(0, 0, 255));  // Blue = booting
-  strip.show();*/
-
   // Buzzer init
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
   // Fan PWM init
   pinMode(FAN_PWM_PIN, OUTPUT);
+
+  // For future fan speed feedback
+  pinMode(TACHO_PIN, INPUT);  // Use Input instead of INPUT_PULLUP because we will add an external pull-up resistor
+  attachInterrupt(digitalPinToInterrupt(TACHO_PIN), onTachoPulse, FALLING);
 
   // WiFi + ESP-NOW init
   WiFi.mode(WIFI_STA);
@@ -118,48 +112,80 @@ void setFanSpeed() {
   Serial.printf("Highest:%4d -> Fan:%3d/255\n", highest, duty);
 }
 
-// ===================== LED CONTROL =====================
-/*void updateLEDs() {
-  uint32_t color;
 
-  // Determine color based on highest sensor reading
-  uint16_t highest = max(packet.mq135, max(packet.mq7, packet.dust));
 
-  if (highest < 1000) {
-    color = strip.Color(0, 255, 0);      // Green = clean
-  } else if (highest < 2000) {
-    color = strip.Color(255, 255, 0);    // Yellow = moderate
-  } else {
-    color = strip.Color(255, 0, 0);      // Red = bad
+// ===================== TACHO / RPM =====================
+// This is for future feedback control. It counts pulses from the fan's tacho wire to calculate RPM.
+// Note: Sunon 60x60 fan gives 2 pulses per revolution, so we need to account for that in the calculation.
+// We use an interrupt to count pulses accurately without blocking the main loop.
+volatile unsigned long pulseCount = 0;
+
+void IRAM_ATTR onTachoPulse() {
+  pulseCount++;
+}
+
+unsigned int getFanRPM() {
+  static unsigned long lastCheck = 0;
+  static unsigned long lastPulseCount = 0;
+
+  unsigned long now = millis();
+  unsigned long elapsed = now - lastCheck;
+
+  if (elapsed >= 1000) {  // Calculate once per second
+    unsigned long pulses = pulseCount - lastPulseCount;
+    lastPulseCount = pulseCount;
+    lastCheck = now;
+
+    // Sunon 60x60 = 2 pulses per revolution
+    return (pulses * 60) / 2;
   }
+  return 0;  // Not ready yet
+}
 
-  strip.fill(color);
-
-}*/
 
 // ===================== MAIN LOOP =====================
 void loop() {
-  if (gotData) {
-    gotData = false;
+  // if (gotData) {
+  //   gotData = false;
 
-    // Print received values
-    Serial.printf("RECV | MQ135:%4d | MQ7:%4d | Dust:%4d | Alert:%s\n",
-                  packet.mq135, packet.mq7, packet.dust,
-                  packet.alert ? "YES" : "no");
+  //   // Print received values
+  //   Serial.printf("RECV | MQ135:%4d | MQ7:%4d | Dust:%4d | Alert:%s\n",
+  //                 packet.mq135, packet.mq7, packet.dust,
+  //                 packet.alert ? "YES" : "no");
 
-    // Update everything
-    setFanSpeed();
-    //updateLEDs();
-    //checkBuzzer();
-  }
+  //   // Update everything
+  //   setFanSpeed();
+  //   //updateLEDs();
+  //   //checkBuzzer();
+  // }
 
-  // Safety: if no data for 10 seconds, run fan at low speed
-  if (millis() - lastDataTime > 10000) {
-    analogWrite(FAN_PWM_PIN, 60);  // Low speed for safety
-    //strip.fill(strip.Color(255, 0, 255));  // Magenta = no data
-    //strip.show();
-    Serial.println("No data! Running fan at safety speed.");
-    lastDataTime = millis();  // Reset so we don't spam
-  }
+  // // Safety: if no data for 10 seconds, run fan at low speed
+  // if (millis() - lastDataTime > 10000) {
+  //   analogWrite(FAN_PWM_PIN, 60);  // Low speed for safety
+  //   //strip.fill(strip.Color(255, 0, 255));  // Magenta = no data
+  //   //strip.show();
+  //   Serial.println("No data! Running fan at safety speed.");
+  //   lastDataTime = millis();  // Reset so we don't spam
+  // }
 
+  // unsigned int rpm = getFanRPM();
+  // if (rpm > 0) {
+  //   Serial.printf("Fan RPM: %d\n", rpm);
+  // }
+
+  // Fan on for 5 seconds
+  analogWrite(FAN_PWM_PIN, 255);
+  Serial.println("Fan ON");
+  delay(5000);
+
+  // Fan off, buzzer beeps
+  analogWrite(FAN_PWM_PIN, 0);
+  tone(BUZZER_PIN, 1000);
+  Serial.println("Fan OFF - Buzzer ON");
+  delay(1000);
+
+  // Buzzer off
+  noTone(BUZZER_PIN);
+  Serial.println("Buzzer OFF");
+  delay(2000);  // Pause before repeating
 }
