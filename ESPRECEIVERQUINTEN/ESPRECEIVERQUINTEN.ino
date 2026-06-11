@@ -31,6 +31,9 @@ typedef struct SensorPacket {
   uint16_t mq7;
   uint16_t dust;
   bool alert;
+  bool mq135Alert;
+  bool mq7Alert;
+  bool dustAlert;
 } SensorPacket;
 
 SensorPacket packet;
@@ -142,50 +145,47 @@ unsigned int getFanRPM() {
   return 0;  // Not ready yet
 }
 
+// BUZZER
+void checkBuzzer() {
+  if (packet.alert) {
+    tone(BUZZER_PIN, 1000);   // 1kHz tone while alert is active
+  } else {
+    noTone(BUZZER_PIN);
+  }
+}
 
-// ===================== MAIN LOOP =====================
+//  MAIN LOOP
 void loop() {
-  // if (gotData) {
-  //   gotData = false;
+  if (gotData) {
+    gotData = false;
 
-  //   // Print received values
-  //   Serial.printf("RECV | MQ135:%4d | MQ7:%4d | Dust:%4d | Alert:%s\n",
-  //                 packet.mq135, packet.mq7, packet.dust,
-  //                 packet.alert ? "YES" : "no");
+    // Log which sender this came from (prep for multi-sender FR-12)
+    // MAC is not stored yet — see onDataRecv note below
+    Serial.printf("RECV | MQ135:%4d | MQ7:%4d | Dust:%4d | Alert:%s\n",
+                  packet.mq135, packet.mq7, packet.dust,
+                  packet.alert ? "YES" : "no");
 
-  //   // Update everything
-  //   setFanSpeed();
-  //   //updateLEDs();
-  //   //checkBuzzer();
-  // }
+    setFanSpeed();
+    checkBuzzer();
+  }
 
-  // // Safety: if no data for 10 seconds, run fan at low speed
-  // if (millis() - lastDataTime > 10000) {
-  //   analogWrite(FAN_PWM_PIN, 60);  // Low speed for safety
-  //   //strip.fill(strip.Color(255, 0, 255));  // Magenta = no data
-  //   //strip.show();
-  //   Serial.println("No data! Running fan at safety speed.");
-  //   lastDataTime = millis();  // Reset so we don't spam
-  // }
+  // After 10 seconds without data, run fan at safety speed
+  if (millis() - lastDataTime > 10000 && lastDataTime > 0) {
+    analogWrite(FAN_PWM_PIN, 60);
+    
+    // Turn the buzzer on once-in-a-while to alert about lost communication
+    if ((millis() / 1000) % 10 == 0) {
+      tone(BUZZER_PIN, 500);  // Low tone every 10 seconds
+    } else {
+      noTone(BUZZER_PIN);
+    }
 
-  // unsigned int rpm = getFanRPM();
+    Serial.println("No data! Running fan at safety speed.");
+    lastDataTime = millis();
+  }
+
+  // unsigned int rpm = getFanRPM(); 
   // if (rpm > 0) {
   //   Serial.printf("Fan RPM: %d\n", rpm);
   // }
-
-  // Fan on for 5 seconds
-  analogWrite(FAN_PWM_PIN, 255);
-  Serial.println("Fan ON");
-  delay(5000);
-
-  // Fan off, buzzer beeps
-  analogWrite(FAN_PWM_PIN, 0);
-  tone(BUZZER_PIN, 1000);
-  Serial.println("Fan OFF - Buzzer ON");
-  delay(1000);
-
-  // Buzzer off
-  noTone(BUZZER_PIN);
-  Serial.println("Buzzer OFF");
-  delay(2000);  // Pause before repeating
 }
