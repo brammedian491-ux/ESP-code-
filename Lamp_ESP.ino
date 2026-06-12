@@ -6,7 +6,10 @@
   - MQ-7 analog output
   - GP2Y1010AU0F Sharp dust sensor analog output
 
-  LED on GPIO 6 turns on when MQ135 value exceeds 470.
+  LED on GPIO 6 turns on when:
+  - MQ135 value exceeds 800
+  OR
+  - MQ7 value exceeds 1000
 */
 
 #include <esp_now.h>
@@ -22,15 +25,15 @@ uint8_t RECEIVER_MAC[6] = {0x24, 0xEC, 0x4A, 0x10, 0x7D, 0x84};
 #define DUST_ANALOG_PIN    3
 #define DUST_LED_PIN       4
 
-#define LED_PIN            6   // LED moved from GPIO 7 to GPIO 6
+#define LED_PIN            6
 
 // ===================== THRESHOLDS =====================
-#define MQ135_THRESHOLD    470
-#define MQ7_THRESHOLD      2000
+#define MQ135_THRESHOLD    800
+#define MQ7_THRESHOLD      1000
 #define DUST_THRESHOLD     2000
 
 // ===================== TIMING =====================
-#define SAMPLE_INTERVAL_MS  2000
+#define SAMPLE_INTERVAL_MS  500
 
 // ===================== DATA PACKET =====================
 typedef struct SensorPacket {
@@ -144,15 +147,17 @@ void loop() {
 
     packet.alert = packet.mq135Alert || packet.mq7Alert || packet.dustAlert;
 
-    // LED on GPIO 6 controlled by MQ135 only
-    digitalWrite(LED_PIN, packet.mq135Alert ? HIGH : LOW);
+    // LED on GPIO 6 turns on if MQ135 OR MQ7 exceeds threshold
+    digitalWrite(LED_PIN, (packet.mq135Alert || packet.mq7Alert) ? HIGH : LOW);
 
     Serial.printf(
-      "MQ135: %4d | MQ7: %4d | Dust: %4d | LED: %s | Overall: %s\n",
+      "MQ135: %4d | MQ7: %4d | Dust: %4d | MQ135 alert: %s | MQ7 alert: %s | LED: %s | Overall: %s\n",
       packet.mq135,
       packet.mq7,
       packet.dust,
-      packet.mq135Alert ? "ON" : "OFF",
+      packet.mq135Alert ? "YES" : "NO",
+      packet.mq7Alert ? "YES" : "NO",
+      (packet.mq135Alert || packet.mq7Alert) ? "ON" : "OFF",
       packet.alert ? "ALERT" : "normal"
     );
 
